@@ -1,14 +1,11 @@
 import sys
 import pygame
 import cpartsim
-import config   
-
-WIDTH = 800
-HEIGHT = 800
+import config      
 
 NUM_PARTICLES = 2500
-DOT_RADIUS = 2
-FPS_CAP    = 60
+DOT_RADIUS    = 2
+FPS_CAP       = 60
 
 def init_simulation_with_seed(n_particles, seed=None):
     if seed is None:
@@ -19,19 +16,6 @@ def init_simulation_with_seed(n_particles, seed=None):
 
 def main():
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Particle Sim w/ Mouse-Attract (C accelerated)")
-    clock = pygame.time.Clock()
-
-    font = pygame.font.Font(None, 24)
-
-    dot_surfaces = []
-    for c in range(config.COLORS):
-        surf = pygame.Surface((DOT_RADIUS * 2, DOT_RADIUS * 2), pygame.SRCALPHA)
-        color = pygame.Color(0)
-        color.hsva = (360.0 / config.COLORS * c, 100, 100, 100)
-        pygame.draw.circle(surf, color, (DOT_RADIUS, DOT_RADIUS), DOT_RADIUS)
-        dot_surfaces.append(surf.convert_alpha())
 
     cpartsim.set_constants(
         config.DT,
@@ -43,11 +27,32 @@ def main():
         config.K_MOUSE
     )
 
+    if config.FULLSCREEN:
+
+        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+
+        WIDTH, HEIGHT = screen.get_size()
+    else:
+
+        WIDTH  = config.SCREEN_WIDTH
+        HEIGHT = config.SCREEN_HEIGHT
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
+    pygame.display.set_caption("Particle Sim w/ Mouse-Attract")
+
+    dot_surfaces = []
+    for c in range(config.COLORS):
+        surf = pygame.Surface((DOT_RADIUS * 2, DOT_RADIUS * 2), pygame.SRCALPHA)
+        color = pygame.Color(0)
+        color.hsva = (360.0 / config.COLORS * c, 100, 100, 100)
+        pygame.draw.circle(surf, color, (DOT_RADIUS, DOT_RADIUS), DOT_RADIUS)
+        dot_surfaces.append(surf.convert_alpha())
+
     if len(sys.argv) >= 2:
         try:
             provided_seed = int(sys.argv[1])
         except ValueError:
-            print("Error: Seed must be an integer. Falling back to time-based seed.")
+            print("Error: Seed must be an integer. Falling back to time‐based seed.")
             provided_seed = None
     else:
         provided_seed = None
@@ -55,17 +60,19 @@ def main():
     current_seed = init_simulation_with_seed(NUM_PARTICLES, provided_seed)
     print(f"Seed used: {current_seed}")
 
-    running = True
-    paused  = False
-    seed_input_active = False
-    seed_input_text   = ""
-
     x_list, y_list, color_list = cpartsim.get_positions()
 
-    while running:
+    paused            = False
+    seed_input_active = False
+    seed_input_text   = ""
+    clock             = pygame.time.Clock()
+    font              = pygame.font.Font(None, 24)
+
+    while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                pygame.quit()
+                return
 
             elif event.type == pygame.KEYDOWN:
                 if seed_input_active:
@@ -77,8 +84,8 @@ def main():
                         except ValueError:
                             print("Invalid seed entered; must be an integer.")
                         seed_input_active = False
-                        seed_input_text = ""
-                        paused = False
+                        seed_input_text   = ""
+                        paused            = False
                         x_list, y_list, color_list = cpartsim.get_positions()
 
                     elif event.key == pygame.K_BACKSPACE:
@@ -86,20 +93,22 @@ def main():
 
                     elif event.key == pygame.K_ESCAPE:
                         seed_input_active = False
-                        seed_input_text = ""
-                        paused = False
+                        seed_input_text   = ""
+                        paused            = False
+
                     else:
                         if event.unicode.isdigit():
                             seed_input_text += event.unicode
-                    continue
+                    continue  
 
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    pygame.quit()
+                    return
 
                 elif event.key == pygame.K_s:
                     seed_input_active = True
-                    seed_input_text = ""
-                    paused = True
+                    seed_input_text   = ""
+                    paused            = True
 
                 elif event.key == pygame.K_r:
                     current_seed = init_simulation_with_seed(NUM_PARTICLES, current_seed)
@@ -114,7 +123,7 @@ def main():
                 elif event.key == pygame.K_SPACE:
                     paused = not paused
 
-        if (not paused) and (not seed_input_active):
+        if not paused and not seed_input_active:
             mx, my = pygame.mouse.get_pos()
             norm_x = mx / WIDTH
             norm_y = my / HEIGHT
@@ -130,7 +139,7 @@ def main():
 
         screen.fill((0, 0, 0))
         for i in range(NUM_PARTICLES):
-            sx = int(x_list[i] * WIDTH)  - DOT_RADIUS
+            sx = int(x_list[i] * WIDTH) - DOT_RADIUS
             sy = int(y_list[i] * HEIGHT) - DOT_RADIUS
             c  = color_list[i]
             screen.blit(dot_surfaces[c], (sx, sy))
@@ -147,15 +156,12 @@ def main():
                 "(Hold LMB to attract, R: replay, N: new seed, S: set seed, SPACE: pause)"
             )
             info_surf = font.render(info, True, (255, 255, 255))
-            bg_rect = pygame.Rect(5, 5, info_surf.get_width() + 10, info_surf.get_height() + 6)
+            bg_rect   = pygame.Rect(5, 5, info_surf.get_width() + 10, info_surf.get_height() + 6)
             pygame.draw.rect(screen, (0, 0, 0), bg_rect)
             screen.blit(info_surf, (10, 8))
 
         pygame.display.flip()
         clock.tick(FPS_CAP)
-
-    pygame.quit()
-    sys.exit()
 
 if __name__ == "__main__":
     main()
