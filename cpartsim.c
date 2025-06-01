@@ -4,13 +4,18 @@
 #include <time.h>
 #include <math.h>
 
-// CONSTANTS MUST BE THE SAME AS IN THE PYTHON CODE
 static int    N_PARTICLES   = 0;
 static double DT            = 0.02;
 static double FRICTION_HALF = 0.04;
 static double R_MAX         = 0.1;
 static int    COLORS        = 6;
 static double FORCE_FACTOR  = 3.0;
+
+static double mouse_x       = -1.0;   
+static double mouse_y       = -1.0;   
+static int    mouse_pressed = 0;      
+static double R_MOUSE       = 0.15;   
+static double K_MOUSE       = 100;    
 
 static double friction_factor = 0.0;
 static double CELL_SIZE       = 0.0;
@@ -27,14 +32,14 @@ typedef struct {
 static Particle *particles = NULL;
 
 typedef struct {
-    int start_idx;
-    int count;
+    int start_idx;  
+    int count;      
 } CellInfo;
 
-static CellInfo *cells   = NULL;
-static int      *indices = NULL;
+static CellInfo *cells   = NULL;  
+static int      *indices = NULL;  
 
-static unsigned int sim_seed = 0;
+static unsigned int sim_seed = 0;  
 
 static double rand01(void) {
     return (double)rand() / (double)RAND_MAX;
@@ -78,11 +83,12 @@ static void build_grid(void) {
         int c = cells[i].count;
         cells[i].start_idx = running_sum;
         running_sum += c;
+
     }
 
     int *cursor = (int*)calloc(total_cells, sizeof(int));
     if (!cursor) {
-        return;
+        return;  
     }
 
     for (int i = 0; i < N_PARTICLES; i++) {
@@ -105,6 +111,7 @@ static void build_grid(void) {
 }
 
 static void do_update_frame(void) {
+
     build_grid();
 
     for (int i = 0; i < N_PARTICLES; i++) {
@@ -146,8 +153,10 @@ static void do_update_frame(void) {
 
                     double dx = p2->x - x1;
                     double dy = p2->y - y1;
+
                     if (dx >  0.5) dx -= 1.0;
                     else if (dx < -0.5) dx += 1.0;
+
                     if (dy >  0.5) dy -= 1.0;
                     else if (dy < -0.5) dy += 1.0;
 
@@ -165,6 +174,19 @@ static void do_update_frame(void) {
             }
         }
 
+        if (mouse_pressed && (mouse_x >= 0.0) && (mouse_y >= 0.0)) {
+            double dxm = mouse_x - x1;  
+            double dym = mouse_y - y1;
+            double dist_m = sqrt(dxm*dxm + dym*dym);
+            if (dist_m < R_MOUSE && dist_m > 1e-6) {
+
+                double mag = K_MOUSE * (1.0 - (dist_m / R_MOUSE));
+                double inv_m = 1.0 / dist_m;
+                total_fx += (dxm * inv_m) * mag;
+                total_fy += (dym * inv_m) * mag;
+            }
+        }
+
         total_fx *= (R_MAX * FORCE_FACTOR);
         total_fy *= (R_MAX * FORCE_FACTOR);
 
@@ -176,6 +198,7 @@ static void do_update_frame(void) {
         Particle *p = &particles[i];
         p->x += p->vx * DT;
         p->y += p->vy * DT;
+
         if (p->x < 0.0)       p->x += 1.0;
         else if (p->x >= 1.0) p->x -= 1.0;
         if (p->y < 0.0)       p->y += 1.0;
@@ -183,11 +206,9 @@ static void do_update_frame(void) {
     }
 }
 
-// Python wrappers
-
 static PyObject *py_init_simulation(PyObject *self, PyObject *args) {
     int n;
-    int seed_in = -1;
+    int seed_in = -1;  
 
     if (!PyArg_ParseTuple(args, "i|i", &n, &seed_in)) {
         return NULL;
@@ -204,6 +225,10 @@ static PyObject *py_init_simulation(PyObject *self, PyObject *args) {
     friction_factor = pow(0.5, (DT / FRICTION_HALF));
     CELL_SIZE       = R_MAX;
     grid_size       = (int)(1.0 / CELL_SIZE);
+
+    mouse_x = -1.0;
+    mouse_y = -1.0;
+    mouse_pressed = 0;
 
     if (particles) {
         free(particles);
@@ -319,6 +344,18 @@ static PyObject *py_get_seed(PyObject *self, PyObject *Py_UNUSED(ignored)) {
     return PyLong_FromUnsignedLong(sim_seed);
 }
 
+static PyObject *py_set_cursor(PyObject *self, PyObject *args) {
+    double mx, my;
+    int   pressed;
+    if (!PyArg_ParseTuple(args, "ddi", &mx, &my, &pressed)) {
+        return NULL;
+    }
+    mouse_x       = mx;
+    mouse_y       = my;
+    mouse_pressed = (pressed != 0) ? 1 : 0;
+    Py_RETURN_NONE;
+}
+
 static void cleanup_simulation(void) {
     if (particles) {
         free(particles);
@@ -343,30 +380,33 @@ static PyMethodDef CPartSimMethods[] = {
      "Initialize the particle simulation with N particles.\n"
      "Usage:\n"
      "  init_simulation(n)            # picks a time-based seed\n"
-     "  init_simulation(n, seed_val)  # uses your provided seed\n"
+     "  init_simulation(n, seed_val)  # uses user-provided seed\n"
     },
     {"update_frame",   (PyCFunction)py_update_frame,   METH_NOARGS,
      "Advance the simulation by one time step."
     },
     {"get_positions",  (PyCFunction)py_get_positions,  METH_NOARGS,
-     "Get three lists: x_coords, y_coords, color indices."
+     "Get three lists: x_coords, y_coords, and color indices."
     },
     {"get_seed",       (PyCFunction)py_get_seed,       METH_NOARGS,
-     "Return the unsigned int seed that was used for this simulation.\n"
-     "If you called init_simulation(n) without passing a seed, this is the time-based seed.\n"
-     "If you called init_simulation(n, seed_val), this returns seed_val."
+     "Return the unsigned int seed that was used."
+    },
+    {"set_cursor",     (PyCFunction)py_set_cursor,     METH_VARARGS,
+     "Set the normalized mouse (x, y) ∈ [0,1] and an integer pressed flag {0,1}.\n"
+     "If pressed==1 and coords ∈ [0,1], particles within R_MOUSE are strongly attracted.\n"
+     "If pressed==0 or coords out of [0,1], disables mouse force."
     },
     {NULL, NULL, 0, NULL}
 };
 
 static struct PyModuleDef cpartsim_module = {
     PyModuleDef_HEAD_INIT,
-    "cpartsim",
-    "C-accelerated particle sim",
+    "cpartsim",                     
+    "C-accelerated particle sim",   
     -1,
     CPartSimMethods,
     NULL, NULL, NULL,
-    (freefunc)cleanup_simulation
+    (freefunc)cleanup_simulation    
 };
 
 PyMODINIT_FUNC PyInit_cpartsim(void) {

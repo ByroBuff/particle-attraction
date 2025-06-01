@@ -4,7 +4,7 @@ from setuptools import setup, Extension
 cpartsim_module = Extension(
     'cpartsim',
     sources=['cpartsim.c'],
-    extra_compile_args=['-O3'],   # optimize aggressively
+    extra_compile_args=['-O3'],
 )
 
 setup(

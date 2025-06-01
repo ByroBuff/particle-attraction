@@ -2,14 +2,13 @@ import sys
 import pygame
 import cpartsim
 
-# CONSTANTS MUST BE THE SAME AS IN THE C CODE
 WIDTH = 800
 HEIGHT = 800
 
 NUM_PARTICLES = 2500
 COLORS        = 6
 
-DOT_RADIUS = 2
+DOT_RADIUS = 2   
 FPS_CAP    = 60
 
 def init_simulation_with_seed(n_particles, seed=None):
@@ -22,10 +21,9 @@ def init_simulation_with_seed(n_particles, seed=None):
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Particle Simulation (Reproducible, C-accelerated)")
+    pygame.display.set_caption("Particle Sim w/ Mouse-Attract (C accelerated)")
     clock = pygame.time.Clock()
 
-    # Font for rendering text
     font = pygame.font.Font(None, 24)
 
     dot_surfaces = []
@@ -48,7 +46,6 @@ def main():
     current_seed = init_simulation_with_seed(NUM_PARTICLES, provided_seed)
     print(f"Seed used: {current_seed}")
 
-    # State variables
     running = True
     paused  = False
 
@@ -63,6 +60,7 @@ def main():
                 running = False
 
             elif event.type == pygame.KEYDOWN:
+
                 if seed_input_active:
                     if event.key == pygame.K_RETURN:
                         try:
@@ -74,44 +72,60 @@ def main():
                         seed_input_active = False
                         seed_input_text = ""
                         paused = False
+
                         x_list, y_list, color_list = cpartsim.get_positions()
+
                     elif event.key == pygame.K_BACKSPACE:
                         seed_input_text = seed_input_text[:-1]
+
                     elif event.key == pygame.K_ESCAPE:
+
                         seed_input_active = False
                         seed_input_text = ""
                         paused = False
+
                     else:
+
                         if event.unicode.isdigit():
                             seed_input_text += event.unicode
-                    continue
+                    continue  
 
                 if event.key == pygame.K_ESCAPE:
                     running = False
 
                 elif event.key == pygame.K_s:
                     seed_input_active = True
-                    seed_input_text   = ""
-                    paused            = True
+                    seed_input_text = ""
+                    paused = True
 
                 elif event.key == pygame.K_r:
-                    # Reset with the same seed
                     current_seed = init_simulation_with_seed(NUM_PARTICLES, current_seed)
                     print(f"Reinitialized with same seed: {current_seed}")
                     x_list, y_list, color_list = cpartsim.get_positions()
 
                 elif event.key == pygame.K_n:
-                    # Reset with a fresh time-based seed
                     current_seed = init_simulation_with_seed(NUM_PARTICLES, None)
                     print(f"Reinitialized with new seed: {current_seed}")
                     x_list, y_list, color_list = cpartsim.get_positions()
 
                 elif event.key == pygame.K_SPACE:
-                    # Toggle pause/resume
                     paused = not paused
 
-        if (not seed_input_active) and (not paused):
+        if (not paused) and (not seed_input_active):
+
+            mx, my = pygame.mouse.get_pos()
+            norm_x = mx / WIDTH
+            norm_y = my / HEIGHT
+            left_pressed = pygame.mouse.get_pressed()[0]  
+
+            if 0.0 <= norm_x <= 1.0 and 0.0 <= norm_y <= 1.0:
+                cpartsim.set_cursor(norm_x, norm_y, 1 if left_pressed else 0)
+            else:
+
+                cpartsim.set_cursor(-1.0, -1.0, 0)
+
             cpartsim.update_frame()
+
             x_list, y_list, color_list = cpartsim.get_positions()
 
         screen.fill((0, 0, 0))
@@ -129,7 +143,7 @@ def main():
             pygame.draw.rect(screen, (0, 0, 0), bg_rect)
             screen.blit(txt_surf, (10, 8))
         else:
-            info = f"Seed: {current_seed}    (R: replay, N: new seed, S: set seed, SPACE: pause)"
+            info = f"Seed: {current_seed}    (Hold LMB to attract, R: replay, N: new seed, S: set seed, SPACE: pause)"
             info_surf = font.render(info, True, (255, 255, 255))
             bg_rect = pygame.Rect(5, 5, info_surf.get_width() + 10, info_surf.get_height() + 6)
             pygame.draw.rect(screen, (0, 0, 0), bg_rect)
@@ -140,7 +154,6 @@ def main():
 
     pygame.quit()
     sys.exit()
-
 
 if __name__ == "__main__":
     main()
