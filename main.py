@@ -1,11 +1,7 @@
 import sys
 import pygame
 import cpartsim
-import config      
-
-NUM_PARTICLES = 2500
-DOT_RADIUS    = 2
-FPS_CAP       = 60
+import config   
 
 def init_simulation_with_seed(n_particles, seed=None):
     if seed is None:
@@ -30,7 +26,6 @@ def main():
     if config.FULLSCREEN:
 
         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-
         WIDTH, HEIGHT = screen.get_size()
     else:
 
@@ -38,14 +33,23 @@ def main():
         HEIGHT = config.SCREEN_HEIGHT
         screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
-    pygame.display.set_caption("Particle Sim w/ Mouse-Attract")
+    pygame.display.set_caption("Particle Sim w/ Mouse‐Attract")
+
+    sim_size = min(WIDTH, HEIGHT)
+    offset_x = (WIDTH  - sim_size) // 2
+    offset_y = (HEIGHT - sim_size) // 2
 
     dot_surfaces = []
     for c in range(config.COLORS):
-        surf = pygame.Surface((DOT_RADIUS * 2, DOT_RADIUS * 2), pygame.SRCALPHA)
+        surf = pygame.Surface((config.DOT_RADIUS * 2, config.DOT_RADIUS * 2), pygame.SRCALPHA)
         color = pygame.Color(0)
         color.hsva = (360.0 / config.COLORS * c, 100, 100, 100)
-        pygame.draw.circle(surf, color, (DOT_RADIUS, DOT_RADIUS), DOT_RADIUS)
+        pygame.draw.circle(
+            surf,
+            color,
+            (config.DOT_RADIUS, config.DOT_RADIUS),
+            config.DOT_RADIUS
+        )
         dot_surfaces.append(surf.convert_alpha())
 
     if len(sys.argv) >= 2:
@@ -57,16 +61,16 @@ def main():
     else:
         provided_seed = None
 
-    current_seed = init_simulation_with_seed(NUM_PARTICLES, provided_seed)
+    current_seed = init_simulation_with_seed(config.NUM_PARTICLES, provided_seed)
     print(f"Seed used: {current_seed}")
 
     x_list, y_list, color_list = cpartsim.get_positions()
 
-    paused            = False
+    paused = False
     seed_input_active = False
-    seed_input_text   = ""
-    clock             = pygame.time.Clock()
-    font              = pygame.font.Font(None, 24)
+    seed_input_text = ""
+    clock = pygame.time.Clock()
+    font = pygame.font.Font(None, 24)
 
     while True:
         for event in pygame.event.get():
@@ -75,17 +79,18 @@ def main():
                 return
 
             elif event.type == pygame.KEYDOWN:
+
                 if seed_input_active:
                     if event.key == pygame.K_RETURN:
                         try:
                             new_seed = int(seed_input_text)
-                            current_seed = init_simulation_with_seed(NUM_PARTICLES, new_seed)
+                            current_seed = init_simulation_with_seed(config.NUM_PARTICLES, new_seed)
                             print(f"Reinitialized with custom seed: {current_seed}")
                         except ValueError:
                             print("Invalid seed entered; must be an integer.")
                         seed_input_active = False
-                        seed_input_text   = ""
-                        paused            = False
+                        seed_input_text = ""
+                        paused = False
                         x_list, y_list, color_list = cpartsim.get_positions()
 
                     elif event.key == pygame.K_BACKSPACE:
@@ -93,8 +98,8 @@ def main():
 
                     elif event.key == pygame.K_ESCAPE:
                         seed_input_active = False
-                        seed_input_text   = ""
-                        paused            = False
+                        seed_input_text = ""
+                        paused = False
 
                     else:
                         if event.unicode.isdigit():
@@ -107,16 +112,16 @@ def main():
 
                 elif event.key == pygame.K_s:
                     seed_input_active = True
-                    seed_input_text   = ""
-                    paused            = True
+                    seed_input_text = ""
+                    paused = True
 
                 elif event.key == pygame.K_r:
-                    current_seed = init_simulation_with_seed(NUM_PARTICLES, current_seed)
+                    current_seed = init_simulation_with_seed(config.NUM_PARTICLES, current_seed)
                     print(f"Reinitialized with same seed: {current_seed}")
                     x_list, y_list, color_list = cpartsim.get_positions()
 
                 elif event.key == pygame.K_n:
-                    current_seed = init_simulation_with_seed(NUM_PARTICLES, None)
+                    current_seed = init_simulation_with_seed(config.NUM_PARTICLES, None)
                     print(f"Reinitialized with new seed: {current_seed}")
                     x_list, y_list, color_list = cpartsim.get_positions()
 
@@ -125,11 +130,11 @@ def main():
 
         if not paused and not seed_input_active:
             mx, my = pygame.mouse.get_pos()
-            norm_x = mx / WIDTH
-            norm_y = my / HEIGHT
             left_pressed = pygame.mouse.get_pressed()[0]
 
-            if 0.0 <= norm_x <= 1.0 and 0.0 <= norm_y <= 1.0:
+            if (offset_x <= mx < offset_x + sim_size) and (offset_y <= my < offset_y + sim_size):
+                norm_x = (mx - offset_x) / sim_size
+                norm_y = (my - offset_y) / sim_size
                 cpartsim.set_cursor(norm_x, norm_y, 1 if left_pressed else 0)
             else:
                 cpartsim.set_cursor(-1.0, -1.0, 0)
@@ -138,11 +143,12 @@ def main():
             x_list, y_list, color_list = cpartsim.get_positions()
 
         screen.fill((0, 0, 0))
-        for i in range(NUM_PARTICLES):
-            sx = int(x_list[i] * WIDTH) - DOT_RADIUS
-            sy = int(y_list[i] * HEIGHT) - DOT_RADIUS
-            c  = color_list[i]
-            screen.blit(dot_surfaces[c], (sx, sy))
+
+        for i in range(config.NUM_PARTICLES):
+            sx = offset_x + int(x_list[i] * sim_size) - config.DOT_RADIUS
+            sy = offset_y + int(y_list[i] * sim_size) - config.DOT_RADIUS
+            c_idx = color_list[i]
+            screen.blit(dot_surfaces[c_idx], (sx, sy))
 
         if seed_input_active:
             prompt = "Enter seed: " + seed_input_text
@@ -161,7 +167,7 @@ def main():
             screen.blit(info_surf, (10, 8))
 
         pygame.display.flip()
-        clock.tick(FPS_CAP)
+        clock.tick(config.FPS_CAP)
 
 if __name__ == "__main__":
     main()
