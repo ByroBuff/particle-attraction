@@ -1,14 +1,13 @@
 import sys
 import pygame
 import cpartsim
+import config   
 
 WIDTH = 800
 HEIGHT = 800
 
 NUM_PARTICLES = 2500
-COLORS        = 6
-
-DOT_RADIUS = 2   
+DOT_RADIUS = 2
 FPS_CAP    = 60
 
 def init_simulation_with_seed(n_particles, seed=None):
@@ -27,12 +26,22 @@ def main():
     font = pygame.font.Font(None, 24)
 
     dot_surfaces = []
-    for c in range(COLORS):
+    for c in range(config.COLORS):
         surf = pygame.Surface((DOT_RADIUS * 2, DOT_RADIUS * 2), pygame.SRCALPHA)
         color = pygame.Color(0)
-        color.hsva = (360.0 / COLORS * c, 100, 100, 100)
+        color.hsva = (360.0 / config.COLORS * c, 100, 100, 100)
         pygame.draw.circle(surf, color, (DOT_RADIUS, DOT_RADIUS), DOT_RADIUS)
         dot_surfaces.append(surf.convert_alpha())
+
+    cpartsim.set_constants(
+        config.DT,
+        config.FRICTION_HALF,
+        config.R_MAX,
+        config.COLORS,
+        config.FORCE_FACTOR,
+        config.R_MOUSE,
+        config.K_MOUSE
+    )
 
     if len(sys.argv) >= 2:
         try:
@@ -48,7 +57,6 @@ def main():
 
     running = True
     paused  = False
-
     seed_input_active = False
     seed_input_text   = ""
 
@@ -60,7 +68,6 @@ def main():
                 running = False
 
             elif event.type == pygame.KEYDOWN:
-
                 if seed_input_active:
                     if event.key == pygame.K_RETURN:
                         try:
@@ -72,23 +79,19 @@ def main():
                         seed_input_active = False
                         seed_input_text = ""
                         paused = False
-
                         x_list, y_list, color_list = cpartsim.get_positions()
 
                     elif event.key == pygame.K_BACKSPACE:
                         seed_input_text = seed_input_text[:-1]
 
                     elif event.key == pygame.K_ESCAPE:
-
                         seed_input_active = False
                         seed_input_text = ""
                         paused = False
-
                     else:
-
                         if event.unicode.isdigit():
                             seed_input_text += event.unicode
-                    continue  
+                    continue
 
                 if event.key == pygame.K_ESCAPE:
                     running = False
@@ -112,24 +115,20 @@ def main():
                     paused = not paused
 
         if (not paused) and (not seed_input_active):
-
             mx, my = pygame.mouse.get_pos()
             norm_x = mx / WIDTH
             norm_y = my / HEIGHT
-            left_pressed = pygame.mouse.get_pressed()[0]  
+            left_pressed = pygame.mouse.get_pressed()[0]
 
             if 0.0 <= norm_x <= 1.0 and 0.0 <= norm_y <= 1.0:
                 cpartsim.set_cursor(norm_x, norm_y, 1 if left_pressed else 0)
             else:
-
                 cpartsim.set_cursor(-1.0, -1.0, 0)
 
             cpartsim.update_frame()
-
             x_list, y_list, color_list = cpartsim.get_positions()
 
         screen.fill((0, 0, 0))
-
         for i in range(NUM_PARTICLES):
             sx = int(x_list[i] * WIDTH)  - DOT_RADIUS
             sy = int(y_list[i] * HEIGHT) - DOT_RADIUS
@@ -143,7 +142,10 @@ def main():
             pygame.draw.rect(screen, (0, 0, 0), bg_rect)
             screen.blit(txt_surf, (10, 8))
         else:
-            info = f"Seed: {current_seed}    (Hold LMB to attract, R: replay, N: new seed, S: set seed, SPACE: pause)"
+            info = (
+                f"Seed: {current_seed}    "
+                "(Hold LMB to attract, R: replay, N: new seed, S: set seed, SPACE: pause)"
+            )
             info_surf = font.render(info, True, (255, 255, 255))
             bg_rect = pygame.Rect(5, 5, info_surf.get_width() + 10, info_surf.get_height() + 6)
             pygame.draw.rect(screen, (0, 0, 0), bg_rect)
